@@ -15,7 +15,7 @@ namespace EasyDrive
         private DiskHttpApi _yclient;
         private HttpClient _client;
 
-        public YandexDrive(string token) 
+        public YandexDrive(string token)
         {
             Token = token;
             _yclient = new DiskHttpApi(Token);
@@ -27,13 +27,12 @@ namespace EasyDrive
 
         public async Task<UploadFile> UploadFileAsync(string filePath, string newFileName, string diskFolderName)
         {
-            //Получаем информацию о корневой папке
+
             var RootFolderData = await _yclient.MetaInfo.GetInfoAsync(new YandexDisk.Client.Protocol.ResourceRequest()
             {
                 Path = "/"
             });
 
-            //Проверяем на наличие папки для картинок
             if (!RootFolderData.Embedded.Items.Any(i => i.Type == ResourceType.Dir
             && i.Name.Equals(diskFolderName)))
             {
@@ -56,10 +55,17 @@ namespace EasyDrive
 
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Token);
             Link link;
-            HttpResponseMessage response = await _client.GetAsync($"https://cloud-api.yandex.net/v1/disk/resources/download?path={strLink}");
+            HttpResponseMessage response = await _client.PutAsync($"https://cloud-api.yandex.net/v1/disk/resources/publish?path={strLink}", null);
             var json = await response.Content.ReadAsStringAsync();
             link = JsonConvert.DeserializeObject<Link>(json);
-            file.DownLoadLink = link.href;
+            
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Token);
+            LinkFile linkFile;
+            HttpResponseMessage response_getlink = await _client.GetAsync(link.href);
+            var json_getlink = await response_getlink.Content.ReadAsStringAsync();
+            linkFile = JsonConvert.DeserializeObject<LinkFile>(json_getlink);
+
+            file.DownLoadLink = linkFile.file;
             file.DrivePath = strLink;
             file.NewName = newFileName;
 
@@ -70,6 +76,7 @@ namespace EasyDrive
         {
             using (WebClient webClient = new WebClient())
             {
+                webClient.Headers.Add(HttpRequestHeader.Authorization, Token);
                 byte[] file = webClient.DownloadData(url);
                 return file;
             }
